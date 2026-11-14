@@ -2,6 +2,15 @@ import {joinRoom} from 'https://esm.sh/trystero@0.27.0'
 
 /* ============ SABİTLER ============ */
 const APP_ID = 'alihamza/yumruk-boks'
+// Varsayılan relay listesinden appId ile seçilen 5 relay'in çoğu ölü — erişilebilir olanlar sabitlendi
+const RELAYS = [
+  'wss://relay.primal.net', 'wss://relay.nostr.com', 'wss://nos.lol',
+  'wss://relay.snort.social', 'wss://nostr.azzamo.net', 'wss://bucket.coracle.social',
+  'wss://relay.nostrhub.fr', 'wss://nostr.wine', 'wss://relay.guggero.org',
+  'wss://relay.nostr.net', 'wss://nostrelay.circum.space', 'wss://nostr.data.haus',
+  'wss://relay.nostr.info', 'wss://no.str.cr', 'wss://relay.angor.io',
+  'wss://yabu.me', 'wss://nostr.overmind.lol'
+]
 const T = {
   START_HP: 100,
   DECIDE: 5000,        // saldırgan karar süresi
@@ -30,7 +39,7 @@ const screens = {
 }
 const el = {
   nick: $('nick'), codeInput: $('code-input'), btnCreate: $('btn-create'),
-  btnJoin: $('btn-join'), menuError: $('menu-error'),
+  btnJoin: $('btn-join'), btnAi: $('btn-ai'), menuError: $('menu-error'),
   roomCode: $('room-code-display'), btnCopy: $('btn-copy'),
   btnCopyLink: $('btn-copy-link'), lobbyStatus: $('lobby-status'),
   slotHost: $('slot-host'), slotGuest: $('slot-guest'),
@@ -56,6 +65,7 @@ const el = {
 /* ============ DURUM ============ */
 const S = {
   phase: 'menu',
+  vsAI: false,
   room: null, msg: null, selfId: null, isHost: false,
   oppId: null, oppName: '', helloSent: false, joinTimer: null,
   code: '', myName: 'Şampiyon',
@@ -267,11 +277,12 @@ function renderFightNames() {
 
 /* ============ AĞ ============ */
 function send(p) {
+  if (S.vsAI) { AI.onSend(p); return }
   if (!S.msg) return
   S.msg.send(p).catch(err => showConn('Mesaj gönderilemedi', (err && err.message) || ''))
 }
 async function setupNetworking(code) {
-  const room = joinRoom({appId: APP_ID, maxUsers: 2, identity: 'none'}, code)
+  const room = joinRoom({appId: APP_ID, maxUsers: 2, identity: 'none', relayConfig: {urls: RELAYS}}, code)
   S.room = room
   try {
     const self = await room.getSelf()
@@ -392,6 +403,7 @@ function toMenu() {
   S.room = null
   S.msg = null
   S.phase = 'menu'
+  S.vsAI = false
   S.oppId = null
   S.oppName = ''
   S.helloSent = false
@@ -407,6 +419,120 @@ function showConn(title, sub) {
   el.connTitle.textContent = title
   el.connSub.textContent = sub
   el.overlayConn.hidden = false
+}
+
+/* ============ AI RAKİP ============ */
+const AI_NAMES = ['ŞAHİN', 'KASIRGA', 'DEMİR', 'GÖLGE', 'PANTHER']
+const AI = {
+  p: {punches: 0, fakes: 0, dodges: 0, faced: 0},
+  punchDodged: false,
+  reset() {
+    this.p = {punches: 0, fakes: 0, dodges: 0, faced: 0}
+    this.punchDodged = false
+  },
+  /* send() tarafından yakalanan oyuncu paketleri */
+  onSend(d) {
+    if (!d || !d.t) return
+    if (d.t === 'act') {
+      // oyuncu saldırdı — AI savunacak
+      this.p[d.kind === 'fake' ? 'fakes' : 'punches']++
+      const t0 = S.phaseToken
+      const seq = d.seq
+      const jitter = Math.floor(Math.random() * 200) - 100
+      later(() => {
+        if (S.phaseToken !== t0 || S.seq !== seq) return
+        if (S.phase !== 'waitResolve' && S.phase !== 'fight') return
+        if (S.attackerId !== S.selfId) return
+        this.defend(d)
+      }, T.RESOLVE_AT + jitter)
+      return
+    }
+    if (d.t === 'resolve') {
+      // AI saldırdı, oyuncu savundu — sonuç yerinde zaten uygulandı
+      if (d.kind === 'punch') {
+        this.p.faced++
+        if (d.dodged) { this.p.dodges++; this.punchDodged = true }
+        else this.punchDodged = false
+      }
+      return
+    }
+    // timeout-act / reset: durum yerinde zaten işlendi
+  },
+  /* AI savunması — resolveDefense'in aynası, AI tarafı için */
+  defend(d) {
+    const wasOff = S.opp.off
+    S.opp.off = false
+    const canDodge = !wasOff
+    const dodge = canDodge && this.wantDodge(d.kind)
+    let payload
+    if (d.kind === 'punch') {
+      const landed = !dodge
+      let dmg = 0
+      if (landed) {
+        dmg = T.BASE_DMG + Math.min(d.combo, T.MAX_COMBO) * T.COMBO_BONUS +
+          (d.counter ? T.COUNTER_DMG : 0) + (d.momentum ? T.MOMENTUM_DMG : 0)
+      }
+      if (!landed && canDodge) S.opp.counter = true
+      payload = {
+        t: 'resolve', seq: d.seq, kind: 'punch', dodged: !landed, landed: landed,
+        dmg: dmg, hp: Math.max(0, S.hpOpp - dmg),
+        defOff: S.opp.off, defCounter: S.opp.counter,
+        atk: {combo: landed ? d.combo + 1 : 0, counter: false, momentum: false}
+      }
+    } else {
+      if (dodge) S.opp.off = true
+      payload = {
+        t: 'resolve', seq: d.seq, kind: 'fake', dodged: dodge, landed: false,
+        dmg: 0, hp: S.hpOpp,
+        defOff: S.opp.off, defCounter: S.opp.counter,
+        atk: {combo: d.combo, counter: d.counter, momentum: dodge ? d.momentum : true}
+      }
+    }
+    applyResolve(payload)
+  },
+  wantDodge(kind) {
+    const total = this.p.punches + this.p.fakes
+    const ratio = total ? this.p.punches / total : 0.5
+    // oyuncu çok yumruk atıyorsa daha çok dodge'lar, çok fake atıyorsa sahteye daha az düşer
+    if (kind === 'fake') return Math.random() < 0.4 - 0.2 * ratio
+    return Math.random() < 0.3 + 0.4 * ratio
+  },
+  /* AI saldırısı — beginExchange'de savunma tarafında çağrılır */
+  planAttack() {
+    const t0 = S.phaseToken
+    const seq = S.seq
+    later(() => {
+      if (S.phaseToken !== t0 || S.phase !== 'fight' || S.seq !== seq) return
+      if (S.attackerId === S.selfId || !S.vsAI) return
+      const kind = this.decideAttack()
+      onAct({t: 'act', seq: seq, kind: kind, combo: S.opp.combo, counter: S.opp.counter, momentum: S.opp.momentum})
+    }, 700 + Math.floor(Math.random() * 1100))
+  },
+  decideAttack() {
+    // oyuncu dengesizken kaçamaz — bedava vuruş
+    if (S.my.off) return 'punch'
+    if (this.punchDodged) { this.punchDodged = false; return 'fake' }
+    if (this.p.faced >= 3 && this.p.dodges / this.p.faced > 0.6 && Math.random() < 0.7) return 'fake'
+    if (S.opp.momentum && Math.random() < 0.75) return 'punch'
+    return Math.random() < 0.65 ? 'punch' : 'fake'
+  }
+}
+
+function startAIGame() {
+  if (S.phase !== 'menu') return
+  Snd.init()
+  Snd.click()
+  S.myName = (el.nick.value || 'Şampiyon').slice(0, 12)
+  S.vsAI = true
+  S.selfId = 'ai-local'
+  S.oppId = 'ai-bot'
+  S.oppName = AI_NAMES[Math.floor(Math.random() * AI_NAMES.length)].slice(0, 12)
+  S.helloSent = true
+  S.code = ''
+  S.msg = null
+  showMenuError('')
+  AI.reset()
+  startFight(S.selfId)
 }
 
 /* ============ MESAJ İŞLEME ============ */
@@ -507,6 +633,7 @@ function beginExchange(seq) {
   } else {
     setBanner('RAKİP HAZIRLANIYOR', 'SAVUNMA HAZIR', 'def')
     setHint('Rakip hamlesi bekleniyor...')
+    if (S.vsAI) AI.planAttack()
   }
 }
 
@@ -541,8 +668,9 @@ function doAct(kind) {
   })
 
   const t0 = S.phaseToken
+  const seqAtAct = S.seq
   setTimeout(() => {
-    if (S.phaseToken !== t0) return
+    if (S.phaseToken !== t0 || S.seq !== seqAtAct) return
     if (S.phase === 'waitResolve' && S.actKind === kind) {
       showConn('BAĞLANTI KOPTU', 'Rakipten yanıt gelmedi.')
     }
@@ -805,6 +933,7 @@ window.addEventListener('keydown', e => {
 /* ============ BAĞLAYICILAR ============ */
 el.btnCreate.addEventListener('click', createGame)
 el.btnJoin.addEventListener('click', joinGame)
+el.btnAi.addEventListener('click', startAIGame)
 
 el.btnCopy.addEventListener('click', async () => {
   try {
