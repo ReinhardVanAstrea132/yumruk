@@ -76,6 +76,13 @@ button, input { font-family: inherit; }
 }
 .btn-alt:not(:disabled):active { box-shadow: 0 2px 0 #1c48a8; }
 
+.btn-ai {
+  background: linear-gradient(180deg, #b487ff, #7c4dff);
+  color: #fff;
+  box-shadow: 0 5px 0 #4b2bb3, 0 10px 20px rgba(0, 0, 0, .4);
+}
+.btn-ai:not(:disabled):active { box-shadow: 0 2px 0 #4b2bb3; }
+
 .btn-ghost {
   background: transparent;
   border: 1px solid #453b66;
