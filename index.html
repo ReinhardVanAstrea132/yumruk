@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YUMRUK! — Arkadaşınla Sıra Tabanlı Boks</title>
+<meta name="description" content="Arkadaşınla online oynayabileceğin sıra tabanlı boks oyunu. Yumruk at, fake at, dodge'la. Ücretsiz, kurulumsuz.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥊</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============ EKRAN: MENÜ ============ -->
+<div id="screen-menu" class="screen active">
+  <div class="logo">
+    <div class="logo-word">YUMRUK<span class="logo-bang">!</span></div>
+    <div class="logo-sub">ARKADAŞINLA SIRA TABANLI BOKS</div>
+  </div>
+
+  <div class="menu-card">
+    <label class="fld" for="nick">İSİM</label>
+    <input id="nick" type="text" maxlength="12" placeholder="Şampiyon" autocomplete="off" spellcheck="false">
+
+    <button id="btn-create" class="btn btn-primary">🥊 ODA KUR</button>
+
+    <div class="divider"><span>VEYA</span></div>
+
+    <label class="fld" for="code-input">ODA KODU</label>
+    <input id="code-input" type="text" maxlength="6" placeholder="ABC123" autocomplete="off" spellcheck="false">
+    <button id="btn-join" class="btn btn-alt">ODA KATIL</button>
+
+    <div id="menu-error" class="error" hidden></div>
+  </div>
+
+  <div class="howto">
+    <div class="howto-title">NASIL OYNANIR</div>
+    <div class="howto-keys">
+      <span><kbd>E</kbd> Gerçek yumruk</span>
+      <span><kbd>Q</kbd> Fake (sahte)</span>
+      <span><kbd>SPACE</kbd> Dodge (kaçın)</span>
+    </div>
+    <p><b>Sıra sende:</b> rakip savunurken <b>E</b> ile vur ya da <b>Q</b> ile kandır.<br>
+       <b>Sıra rakipte:</b> geliştirdiği anda <b>SPACE</b> ile doğru anda kaçın.<br>
+       Fake'e kapılan rakip <b>bir sonraki turda kaçamaz!</b></p>
+  </div>
+</div>
+
+<!-- ============ EKRAN: LOBİ ============ -->
+<div id="screen-lobby" class="screen" hidden>
+  <div class="lobby-card">
+    <div class="lobby-title">ODAN HAZIR</div>
+    <div class="room-code" id="room-code-display">------</div>
+    <div class="lobby-btns">
+      <button id="btn-copy" class="btn btn-ghost">📋 KODU KOPYALA</button>
+      <button id="btn-copy-link" class="btn btn-ghost">🔗 DAVET LİNKİNİ KOPYALA</button>
+    </div>
+    <div id="lobby-status" class="lobby-status">Arkadaşın katılmayı bekliyor<span class="dots"></span></div>
+    <div class="slots">
+      <div class="slot" id="slot-host"><span class="slot-dot"></span><span class="slot-name">...</span></div>
+      <div class="vs-mark">VS</div>
+      <div class="slot" id="slot-guest"><span class="slot-dot"></span><span class="slot-name">...</span></div>
+    </div>
+    <button id="btn-start" class="btn btn-primary" disabled>MAÇA BAŞLA</button>
+    <button id="btn-back" class="btn btn-ghost btn-small">İPTAL</button>
+    <div class="howto-keys lobby-keys">
+      <span><kbd>E</kbd> Yumruk</span><span><kbd>Q</kbd> Fake</span><span><kbd>SPACE</kbd> Dodge</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============ EKRAN: MAÇ ============ -->
+<div id="screen-fight" class="screen fight" hidden>
+
+  <div class="hud">
+    <div class="fh fh-left">
+      <div class="fh-row"><span class="fh-name" id="hud-name-me">SEN</span><span class="fh-pct" id="pct-me">100</span></div>
+      <div class="hp-bar hp-from-left"><div class="hp-fill" id="hp-me"></div></div>
+      <div class="fh-badges" id="badges-me"></div>
+    </div>
+    <div class="hud-mid"><div class="turn-label" id="turn-label">TUR 1</div></div>
+    <div class="fh fh-right">
+      <div class="fh-row"><span class="fh-pct" id="pct-opp">100</span><span class="fh-name" id="hud-name-opp">RAKİP</span></div>
+      <div class="hp-bar hp-from-right"><div class="hp-fill" id="hp-opp"></div></div>
+      <div class="fh-badges fh-badges-right" id="badges-opp"></div>
+    </div>
+  </div>
+
+  <div class="ring" id="ring">
+    <div class="back-wall"></div>
+    <div class="spotlight"></div>
+    <div class="ropes"><i></i><i></i><i></i></div>
+    <div class="floor"></div>
+
+    <!-- SOL DÖVÜŞÇÜ (SEN) -->
+    <div class="boxer" id="boxer-me">
+      <div class="bx-inner">
+        <div class="bx-arm bx-arm-back"><i class="bx-glove"></i></div>
+        <div class="bx-leg bx-leg-l"></div>
+        <div class="bx-leg bx-leg-r"></div>
+        <div class="bx-shorts"></div>
+        <div class="bx-torso"></div>
+        <div class="bx-head"><i class="bx-band"></i><i class="bx-eye"></i></div>
+        <div class="bx-arm bx-arm-front"><i class="bx-glove"></i></div>
+      </div>
+      <div class="bx-shadow"></div>
+    </div>
+
+    <!-- SAĞ DÖVÜŞÇÜ (RAKİP) -->
+    <div class="boxer mirror" id="boxer-opp">
+      <div class="bx-inner">
+        <div class="bx-arm bx-arm-back"><i class="bx-glove"></i></div>
+        <div class="bx-leg bx-leg-l"></div>
+        <div class="bx-leg bx-leg-r"></div>
+        <div class="bx-shorts"></div>
+        <div class="bx-torso"></div>
+        <div class="bx-head"><i class="bx-band"></i><i class="bx-eye"></i></div>
+        <div class="bx-arm bx-arm-front"><i class="bx-glove"></i></div>
+      </div>
+      <div class="bx-shadow"></div>
+    </div>
+
+    <div class="banner" id="banner"></div>
+    <div class="window-bar" id="window-bar" hidden>
+      <div class="wb-fill" id="wb-fill"></div>
+      <div class="wb-zone" id="wb-zone" hidden></div>
+    </div>
+    <div class="callout" id="callout"></div>
+    <div class="fx-layer" id="fx-layer"></div>
+  </div>
+
+  <div class="controls-hint" id="controls-hint"></div>
+  <div class="log" id="log"></div>
+</div>
+
+<!-- ============ OVERLAY: MAÇ SONUCU ============ -->
+<div id="overlay-result" class="overlay" hidden>
+  <div class="result-card">
+    <div class="result-title" id="result-title">K.O.!</div>
+    <div class="result-sub" id="result-sub"></div>
+    <div class="stats" id="stats-grid">
+      <div class="stat"><span class="stat-v" id="st-thrown">0</span><span class="stat-k">YUMRUK</span></div>
+      <div class="stat"><span class="stat-v" id="st-landed">0</span><span class="stat-k">İSABET</span></div>
+      <div class="stat"><span class="stat-v" id="st-dodged">0</span><span class="stat-k">DODGE</span></div>
+      <div class="stat"><span class="stat-v" id="st-fakes">0</span><span class="stat-k">FAKE</span></div>
+      <div class="stat"><span class="stat-v" id="st-taken">0</span><span class="stat-k">YEME</span></div>
+    </div>
+    <button id="btn-rematch" class="btn btn-primary">TEKRAR OYNA (R)</button>
+    <button id="btn-menu" class="btn btn-ghost">ANA MENÜ</button>
+  </div>
+</div>
+
+<!-- ============ OVERLAY: BAĞLANTI ============ -->
+<div id="overlay-conn" class="overlay" hidden>
+  <div class="result-card">
+    <div class="result-title small-title" id="conn-title">BAĞLANTI KOPTU</div>
+    <div class="result-sub" id="conn-sub"></div>
+    <button id="btn-conn-menu" class="btn btn-primary">ANA MENÜ</button>
+  </div>
+</div>
+
+<script type="module" src="game.js"></script>
+</body>
+</html>
